@@ -1,4 +1,5 @@
 name: linter-irods-clang-tidy
+
 on:
     workflow_call:
         inputs:
@@ -6,12 +7,14 @@ on:
                 description: Install irods-dev package before running clang-tidy.
                 required: true
                 type: boolean
+
 defaults:
     run:
         shell: bash
+
 jobs:
     clang-tidy:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-20.04
         steps:
             - name: Checkout Repository
               uses: actions/checkout@v3
@@ -84,9 +87,6 @@ jobs:
                 export PATH=/opt/irods-externals/clang13.0.0-0/bin:$PATH
                 export PATH=/opt/irods-externals/clang13.0.0-0/share/clang:$PATH
 
-                # Download .clang-tidy config file.
-                wget https://raw.githubusercontent.com/korydraughn/irods_reusable_github_workflows/main/.clang-tidy
-
                 # Run clang-tidy on the changes.
                 git diff -U0 origin/$GITHUB_BASE_REF | \
                     clang-tidy-diff.py -p1 -path build/compile_commands.json -quiet | \
@@ -109,4 +109,3 @@ jobs:
                 fi
 
                 echo "Source code is tidy :-)"
-

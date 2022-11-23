@@ -1,11 +1,14 @@
 name: linter-irods-clang-format
+
 on: [workflow_call]
+
 defaults:
     run:
         shell: bash
+
 jobs:
     clang-format:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-20.04
         steps:
             - name: Checkout Repository
               uses: actions/checkout@v3
@@ -33,9 +36,6 @@ jobs:
                   git config --global clangFormat.binary clang-format
                   git config --global clangFormat.style file
                   git config --global clangFormat.extensions 'h,c,hpp,cpp'
-
-                  # Download .clang-format config file.
-                  wget https://raw.githubusercontent.com/korydraughn/irods_reusable_github_workflows/main/.clang-format
 
                   # Diff the target branch with all changes made within the pull request.
                   diff_output=$(git clang-format --diff origin/$GITHUB_BASE_REF)
