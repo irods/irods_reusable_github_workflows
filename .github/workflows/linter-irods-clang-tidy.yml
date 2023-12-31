@@ -81,7 +81,7 @@ jobs:
                 export PATH=/opt/irods-externals/cmake3.21.4-0/bin:$PATH
                 mkdir build
                 cd build
-                cmake ..
+                cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
             - name: Run Clang-Tidy
               run: |
                 # Make clang and clang-tidy available.
