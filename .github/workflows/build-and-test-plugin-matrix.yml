@@ -1,0 +1,119 @@
+name: build-and-test-plugin
+
+on: workflow_call
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  debian:
+    strategy:
+      matrix:
+        include:
+          # Debian 12
+          - docker_image: debian:12
+            irods_package_version: 5.0.0-0~bookworm
+            build_artifact_suffix: debian_12-5.0.0-0
+            plugin_package_directory: 'Debian gnu_linux_12'
+            irods_testing_environment_project_os: debian-12
+            irods_testing_environment_project_db: postgres-16
+          - docker_image: debian:12
+            irods_package_version: 5.0.2-0~bookworm
+            build_artifact_suffix: debian_12-5.0.2-0
+            plugin_package_directory: 'Debian gnu_linux_12'
+            irods_testing_environment_project_os: debian-12
+            irods_testing_environment_project_db: postgres-16
+
+          # Debian 13
+          - docker_image: debian:13
+            irods_package_version: 5.0.2-0~trixie
+            build_artifact_suffix: debian_13-5.0.2-0
+            plugin_package_directory: 'Debian gnu_linux_13'
+            irods_testing_environment_project_os: debian-13
+            irods_testing_environment_project_db: postgres-16
+
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-debian.yml@main
+    with:
+      docker_image: ${{ matrix.docker_image }}
+      irods_package_version: ${{ matrix.irods_package_version }}
+      build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
+      plugin_package_directory: ${{ matrix.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ matrix.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ matrix.irods_testing_environment_project_db }}
+
+  enterprise_linux:
+    strategy:
+      matrix:
+        include:
+          # EL9
+          - docker_image: rockylinux/rockylinux:9
+            irods_package_version: 5.0.0-0.el9
+            build_artifact_suffix: rockylinux_9-5.0.0-0
+            plugin_package_directory: 'Rocky linux_9'
+            irods_testing_environment_project_os: rockylinux-9
+            irods_testing_environment_project_db: postgres-16
+          - docker_image: rockylinux/rockylinux:9
+            irods_package_version: 5.0.2-0.el9
+            build_artifact_suffix: rockylinux_9-5.0.2-0
+            plugin_package_directory: 'Rocky linux_9'
+            irods_testing_environment_project_os: rockylinux-9
+            irods_testing_environment_project_db: postgres-16
+
+          # EL10
+          - docker_image: rockylinux/rockylinux:10
+            irods_package_version: 5.0.2-0.el10
+            build_artifact_suffix: rockylinux_10-5.0.2-0
+            plugin_package_directory: 'Rocky linux_10'
+            irods_testing_environment_project_os: rockylinux-10
+            irods_testing_environment_project_db: postgres-16
+
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-enterprise-linux.yml@main
+    with:
+      docker_image: ${{ matrix.docker_image }}
+      irods_package_version: ${{ matrix.irods_package_version }}
+      build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
+      plugin_package_directory: ${{ matrix.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ matrix.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ matrix.irods_testing_environment_project_db }}
+
+  ubuntu:
+    strategy:
+      matrix:
+        include:
+          # Ubuntu 22.04
+          - docker_image: ubuntu:22.04
+            irods_package_version: 5.0.0-0~jammy
+            build_artifact_suffix: ubuntu_22-5.0.0-0
+            plugin_package_directory: Ubuntu_22
+            irods_testing_environment_project_os: ubuntu-22.04
+            irods_testing_environment_project_db: postgres-16
+          - docker_image: ubuntu:22.04
+            irods_package_version: 5.0.2-0~jammy
+            build_artifact_suffix: ubuntu_22-5.0.2-0
+            plugin_package_directory: Ubuntu_22
+            irods_testing_environment_project_os: ubuntu-22.04
+            irods_testing_environment_project_db: postgres-16
+
+          # Ubuntu 24.04
+          - docker_image: ubuntu:24.04
+            irods_package_version: 5.0.0-0~noble
+            build_artifact_suffix: ubuntu_24-5.0.0-0
+            plugin_package_directory: Ubuntu_24
+            irods_testing_environment_project_os: ubuntu-24.04
+            irods_testing_environment_project_db: postgres-16
+          - docker_image: ubuntu:24.04
+            irods_package_version: 5.0.2-0~noble
+            build_artifact_suffix: ubuntu_24-5.0.2-0
+            plugin_package_directory: Ubuntu_24
+            irods_testing_environment_project_os: ubuntu-24.04
+            irods_testing_environment_project_db: postgres-16
+
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-ubuntu.yml@main
+    with:
+      docker_image: ${{ matrix.docker_image }}
+      irods_package_version: ${{ matrix.irods_package_version }}
+      build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
+      plugin_package_directory: ${{ matrix.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ matrix.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ matrix.irods_testing_environment_project_db }}
