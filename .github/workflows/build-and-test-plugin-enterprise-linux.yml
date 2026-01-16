@@ -1,0 +1,144 @@
+name: build-and-test-plugin-enterprise-linux
+
+on:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: The docker image and tag identifying the OS used to compile the plugin (e.g. rockylinux/rockylinux:10).
+        required: true
+        type: string
+      irods_package_version:
+        description: The package version of iRODS used to compile the plugin (e.g. 5.0.2-0.el10).
+        required: true
+        type: string
+      build_artifact_suffix:
+        description: The name used to uniquely identify build output across workflow jobs (e.g. rockylinux_10-5.0.2-0).
+        required: true
+        type: string
+      plugin_package_directory:
+        description: The directory name which is expected to hold the plugin packages (e.g. 'Rocky linux_10'). Required by the irods_python_ci_utilities module.
+        required: true
+        type: string
+      irods_testing_environment_project_os:
+        description: The OS component of the project directory to test against. When joined with 'irods_testing_environment_project_db', it must match a directory under the projects directory within the iRODS Testing Environment repository (e.g. rockylinux-10).
+        required: true
+        type: string
+      irods_testing_environment_project_db:
+        description: The DB component of the project directory to test against. When joined with 'irods_testing_environment_project_os', it must match a directory under the projects directory within the iRODS Testing Environment repository (e.g. postgres-16).
+        required: true
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build_plugin:
+    name: Build - ${{ inputs.irods_package_version }}, ${{ inputs.docker_image }}
+
+    runs-on: ubuntu-latest
+    container: ${{ inputs.docker_image }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install prerequisite packages
+        run: |
+          dnf update -y
+          dnf install -y \
+            dnf-plugins-core \
+            epel-release \
+            gcc-c++ \
+            git \
+            rpm-build \
+            sudo \
+            wget
+          dnf install -y \
+            cmake \
+            python3-devel \
+            python3-distro \
+            python3-packaging \
+            python3-pip
+
+      - name: Set up iRODS externals package repository
+        run: |
+          rpm --import https://packages.irods.org/irods-signing-key.asc
+          wget -qO - https://packages.irods.org/renci-irods.yum.repo | tee /etc/yum.repos.d/renci-irods.yum.repo
+
+      - name: Install iRODS development packages
+        run: |
+          dnf update -y
+          dnf install -y \
+            irods-devel-${{ inputs.irods_package_version }} \
+            irods-runtime-${{ inputs.irods_package_version }}
+
+      - name: Install iRODS python CI utilities
+        run: |
+          python3 -m pip install git+https://github.com/irods/irods_python_ci_utilities.git@main
+
+      - name: Build and package
+        run: |
+          mkdir _build
+          python3 irods_consortium_continuous_integration_build_hook.py --build_directory _build
+
+      - name: List contents of build directory
+        run: ls -l _build
+
+      - name: Upload build output for dependent jobs
+        uses: actions/upload-artifact@v6
+        with:
+          name: build_output-${{ inputs.build_artifact_suffix }}
+          path: _build/*.rpm
+          retention-days: 1
+          overwrite: true
+
+  run_tests:
+    needs: build_plugin
+
+    name: Test - ${{ inputs.irods_package_version }}, ${{ inputs.irods_testing_environment_project_os }}, ${{ inputs.irods_testing_environment_project_db }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up python for iRODS testing environment
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.8'
+
+      - name: Download build output
+        uses: actions/download-artifact@v7
+        with:
+          name: build_output-${{ inputs.build_artifact_suffix }}
+          path: ${{ inputs.plugin_package_directory }}
+
+      - name: Set up docker compose
+        uses: docker/setup-compose-action@v1
+
+      - name: Set up iRODS testing environment
+        run: |
+          git clone https://github.com/irods/irods_testing_environment
+          cd irods_testing_environment
+          python3 -m venv venv_testing_env
+          . venv_testing_env/bin/activate
+          python --version
+          pip install docker-compose GitPython
+          pip install docker'<7' requests==2.26.0
+          pip freeze
+
+      - name: Run tests
+        run: |
+          ls -l "${{ inputs.plugin_package_directory }}"
+          cd irods_testing_environment
+          . venv_testing_env/bin/activate
+          project_dir="${{ inputs.irods_testing_environment_project_os }}/${{ inputs.irods_testing_environment_project_os }}-${{ inputs.irods_testing_environment_project_db }}"
+          python run_plugin_tests.py \
+            "${GITHUB_REPOSITORY#${GITHUB_REPOSITORY_OWNER}/}" \
+            --project-directory "projects/${project_dir}" \
+            --irods-package-version ${{ inputs.irods_package_version }} \
+            --plugin-package-directory .. \
+            --discard-logs \
+            -v
