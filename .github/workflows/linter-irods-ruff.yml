@@ -1,0 +1,59 @@
+name: linter-irods-ruff
+
+on: [workflow_call]
+
+defaults:
+    run:
+        shell: bash
+
+jobs:
+    ruff-check:
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v3
+              with:
+                  # Get all history for the repository (branches, tags, etc).
+                  # This is required in order for git_ruff to work correctly
+                  fetch-depth: 0
+                  path: src-repo
+            - name: Checkout Workflow Repository
+              uses: actions/checkout@v3
+              with:
+                  repository: irods/irods_reusable_github_workflows
+                  path: workflow-repo
+            - name: Install Prerequisites
+              run: |
+                  sudo apt-get update -qq
+                  sudo apt-get install -qq apt-transport-https ca-certificates
+                  sudo apt-get install -qq python3
+                  sudo pip3 install termcolor ruff --break-system-packages
+            - name: Run ruff check
+              run: |
+                  cd "${GITHUB_WORKSPACE}/src-repo"
+                  "${GITHUB_WORKSPACE}/workflow-repo/git_ruff.py" check --since-commit="origin/${GITHUB_BASE_REF}"
+    ruff-format:
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v3
+              with:
+                  # Get all history for the repository (branches, tags, etc).
+                  # This is required in order for git_ruff to work correctly
+                  fetch-depth: 0
+                  path: src-repo
+            - name: Checkout Workflow Repository
+              uses: actions/checkout@v3
+              with:
+                  repository: irods/irods_reusable_github_workflows
+                  path: workflow-repo
+            - name: Install Prerequisites
+              run: |
+                  sudo apt-get update -qq
+                  sudo apt-get install -qq apt-transport-https ca-certificates
+                  sudo apt-get install -qq python3
+                  sudo pip3 install termcolor ruff --break-system-packages
+            - name: Run ruff format
+              run: |
+                  cd "${GITHUB_WORKSPACE}/src-repo"
+                  "${GITHUB_WORKSPACE}/workflow-repo/git_ruff.py" format --since-commit="origin/${GITHUB_BASE_REF}"
