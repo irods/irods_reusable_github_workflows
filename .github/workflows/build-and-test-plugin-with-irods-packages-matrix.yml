@@ -1,0 +1,164 @@
+# This workflow defines the matrix used to build and test iRODS plugins using
+# pre-release iRODS server and iCommands packages, for all supported platforms.
+#
+# To use this workflow, repositories must meet the requirements for plugin
+# testing, as documented at the following URLs.
+#
+# - https://github.com/irods/irods_development_environment#how-to-build-an-irods-plugin
+# - https://github.com/irods/irods_testing_environment#run-irods-plugin-tests
+
+name: build-and-test-plugin-with-irods-packages-matrix
+
+on:
+  workflow_call:
+    inputs:
+      test_against_mysql:
+        description: Run tests against MySQL.
+        required: false
+        type: boolean
+        default: false
+      test_against_mariadb:
+        description: Run tests against MariaDB.
+        required: false
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  debian:
+    strategy:
+      matrix:
+        include:
+          # Debian 12
+          - docker_image: debian:12
+            cache_key_irods_packages_prefix: cache-irods-debian-12
+            cache_key_icommands_packages_prefix: cache-icommands-debian-12
+            ccache_key: ccache-irods-debian-12
+            build_artifact_suffix: debian_12-main
+            plugin_package_directory: 'Debian gnu_linux_12'
+            irods_testing_environment_project_os: debian-12
+            irods_testing_environment_project_db: postgres-16
+
+          # Debian 13
+          - docker_image: debian:13
+            cache_key_irods_packages_prefix: cache-irods-debian-13
+            cache_key_icommands_packages_prefix: cache-icommands-debian-13
+            ccache_key: ccache-irods-debian-13
+            build_artifact_suffix: debian_13-main
+            plugin_package_directory: 'Debian gnu_linux_13'
+            irods_testing_environment_project_os: debian-13
+            irods_testing_environment_project_db: postgres-16
+
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-pipeline-debian.yml@main
+    with:
+      docker_image: ${{ matrix.docker_image }}
+      cache_key_irods_packages_prefix: ${{ matrix.cache_key_irods_packages_prefix }}
+      cache_key_icommands_packages_prefix: ${{ matrix.cache_key_icommands_packages_prefix }}
+      ccache_key: ${{ matrix.ccache_key }}
+      build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
+      plugin_package_directory: ${{ matrix.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ matrix.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ matrix.irods_testing_environment_project_db }}
+
+  enterprise_linux:
+    strategy:
+      matrix:
+        include:
+          # EL9
+          - docker_image: rockylinux/rockylinux:9
+            cache_key_irods_packages_prefix: cache-irods-el9
+            cache_key_icommands_packages_prefix: cache-icommands-el9
+            ccache_key: ccache-irods-el9
+            build_artifact_suffix: rockylinux_9-main
+            plugin_package_directory: 'Rocky linux_9'
+            irods_testing_environment_project_os: rockylinux-9
+            irods_testing_environment_project_db: postgres-16
+
+          # EL10
+          - docker_image: rockylinux/rockylinux:10
+            cache_key_irods_packages_prefix: cache-irods-el10
+            cache_key_icommands_packages_prefix: cache-icommands-el10
+            ccache_key: ccache-irods-el10
+            build_artifact_suffix: rockylinux_10-main
+            plugin_package_directory: 'Rocky linux_10'
+            irods_testing_environment_project_os: rockylinux-10
+            irods_testing_environment_project_db: postgres-16
+
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-pipeline-enterprise-linux.yml@main
+    with:
+      docker_image: ${{ matrix.docker_image }}
+      cache_key_irods_packages_prefix: ${{ matrix.cache_key_irods_packages_prefix }}
+      cache_key_icommands_packages_prefix: ${{ matrix.cache_key_icommands_packages_prefix }}
+      ccache_key: ${{ matrix.ccache_key }}
+      build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
+      plugin_package_directory: ${{ matrix.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ matrix.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ matrix.irods_testing_environment_project_db }}
+
+  ubuntu:
+    strategy:
+      matrix:
+        include:
+          # Ubuntu 22.04
+          - docker_image: ubuntu:22.04
+            cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04
+            cache_key_icommands_packages_prefix: cache-icommands-ubuntu-22.04
+            ccache_key: ccache-irods-ubuntu-22.04
+            build_artifact_suffix: ubuntu_22-main
+            plugin_package_directory: Ubuntu_22
+            irods_testing_environment_project_os: ubuntu-22.04
+            irods_testing_environment_project_db: postgres-16
+
+          # Ubuntu 24.04
+          - docker_image: ubuntu:24.04
+            cache_key_irods_packages_prefix: cache-irods-ubuntu-24.04
+            cache_key_icommands_packages_prefix: cache-icommands-ubuntu-24.04
+            ccache_key: ccache-irods-ubuntu-24.04
+            build_artifact_suffix: ubuntu_24-main
+            plugin_package_directory: Ubuntu_24
+            irods_testing_environment_project_os: ubuntu-24.04
+            irods_testing_environment_project_db: postgres-16
+
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-pipeline-ubuntu.yml@main
+    with:
+      docker_image: ${{ matrix.docker_image }}
+      cache_key_irods_packages_prefix: ${{ matrix.cache_key_irods_packages_prefix }}
+      cache_key_icommands_packages_prefix: ${{ matrix.cache_key_icommands_packages_prefix }}
+      ccache_key: ${{ matrix.ccache_key }}
+      build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
+      plugin_package_directory: ${{ matrix.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ matrix.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ matrix.irods_testing_environment_project_db }}
+
+  mysql:
+    needs: ubuntu
+
+    if: ${{ inputs.test_against_mysql }}
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-pipeline-ubuntu.yml@main
+    with:
+      docker_image: ubuntu:22.04
+      cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04
+      cache_key_icommands_packages_prefix: cache-icommands-ubuntu-22.04
+      ccache_key: ccache-irods-ubuntu-22.04
+      build_artifact_suffix: ubuntu_22-main
+      plugin_package_directory: Ubuntu_22
+      irods_testing_environment_project_os: ubuntu-22.04
+      irods_testing_environment_project_db: mysql-8.0
+
+  mariadb:
+    needs: ubuntu
+
+    if: ${{ inputs.test_against_mariadb }}
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-pipeline-ubuntu.yml@main
+    with:
+      docker_image: ubuntu:22.04
+      cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04
+      cache_key_icommands_packages_prefix: cache-icommands-ubuntu-22.04
+      ccache_key: ccache-irods-ubuntu-22.04
+      build_artifact_suffix: ubuntu_22-main
+      plugin_package_directory: Ubuntu_22
+      irods_testing_environment_project_os: ubuntu-22.04
+      irods_testing_environment_project_db: mariadb-10.11
