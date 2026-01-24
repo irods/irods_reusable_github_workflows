@@ -1,0 +1,72 @@
+# This workflow is used to sequence the building of iRODS/iCommands packages,
+# plugins, and testing of plugins.
+#
+# This particular workflow targets Enterprise Linux platforms.
+
+name: build-and-test-plugin-with-irods-packages-pipeline-enterprise-linux
+
+on:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: The docker image and tag identifying the OS used to compile source code (e.g. rockylinux/rockylinux:10).
+        required: true
+        type: string
+      cache_key_irods_packages_prefix:
+        description: The key which potentially identifies a cached build of the irods/irods source code.
+        required: true
+        type: string
+      cache_key_icommands_packages_prefix:
+        description: The key which potentially identifies a cached build of the irods/irods_client_icommands source code.
+        required: true
+        type: string
+      ccache_key:
+        description: The key which potentially identifies ccache state from a previous build.
+        required: true
+        type: string
+      build_artifact_suffix:
+        description: The name used to uniquely identify build output across workflow jobs (e.g. rockylinux_10-main).
+        required: true
+        type: string
+      plugin_package_directory:
+        description: The directory name which is expected to hold the plugin packages (e.g. 'Rocky linux_10'). Required by the irods_python_ci_utilities module.
+        required: true
+        type: string
+      irods_testing_environment_project_os:
+        description: The OS component of the project directory to test against. When joined with 'irods_testing_environment_project_db', it must match a directory under the projects directory within the iRODS Testing Environment repository (e.g. rockylinux-10).
+        required: true
+        type: string
+      irods_testing_environment_project_db:
+        description: The DB component of the project directory to test against. When joined with 'irods_testing_environment_project_os', it must match a directory under the projects directory within the iRODS Testing Environment repository (e.g. postgres-16).
+        required: true
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build_irods_packages:
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-irods-and-icommands-packages-enterprise-linux.yml@main
+    with:
+      docker_image: ${{ inputs.docker_image }}
+      cache_key_irods_packages_prefix: ${{ inputs.cache_key_irods_packages_prefix }}
+      cache_key_icommands_packages_prefix: ${{ inputs.cache_key_icommands_packages_prefix }}
+      ccache_key: ${{ inputs.ccache_key }}
+      build_artifact_suffix: ${{ inputs.build_artifact_suffix }}
+      plugin_package_directory: ${{ inputs.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ inputs.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ inputs.irods_testing_environment_project_db }}
+
+  build_and_test_plugin_with_irods_packages:
+    needs: build_irods_packages
+
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-enterprise-linux.yml@main
+    with:
+      docker_image: ${{ needs.build_irods_packages.outputs.docker_image }}
+      build_artifact_suffix: ${{ needs.build_irods_packages.outputs.build_artifact_suffix }}
+      plugin_package_directory: ${{ needs.build_irods_packages.outputs.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ needs.build_irods_packages.outputs.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ needs.build_irods_packages.outputs.irods_testing_environment_project_db }}
+      cache_key_irods_packages: ${{ needs.build_irods_packages.outputs.cache_key_irods_packages }}
+      cache_key_icommands_packages: ${{ needs.build_irods_packages.outputs.cache_key_icommands_packages }}

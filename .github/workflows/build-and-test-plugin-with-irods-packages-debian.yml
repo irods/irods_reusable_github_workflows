@@ -1,0 +1,192 @@
+# This workflow builds a plugin using pre-release iRODS packages and runs the
+# plugin tests using the irods/irods_testing_environment GitHub repository.
+#
+# This particular workflow targets Debian platforms.
+
+name: build-and-test-plugin-with-irods-packages-debian
+
+on:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: The docker image and tag identifying the OS used to compile the plugin (e.g. debian:13).
+        required: true
+        type: string
+      build_artifact_suffix:
+        description: The name used to uniquely identify build output across workflow jobs (e.g. debian_13-main).
+        required: true
+        type: string
+      plugin_package_directory:
+        description: The directory name which is expected to hold the plugin packages (e.g. 'Debian gnu_linux_13'). Required by the irods_python_ci_utilities module.
+        required: true
+        type: string
+      irods_testing_environment_project_os:
+        description: The OS component of the project directory to test against. When joined with 'irods_testing_environment_project_db', it must match a directory under the projects directory within the iRODS Testing Environment repository (e.g. debian-13).
+        required: true
+        type: string
+      irods_testing_environment_project_db:
+        description: The DB component of the project directory to test against. When joined with 'irods_testing_environment_project_os', it must match a directory under the projects directory within the iRODS Testing Environment repository (e.g. postgres-16).
+        required: true
+        type: string
+      cache_key_irods_packages:
+        description: The key which potentially identifies a cached build of the irods/irods source code.
+        required: true
+        type: string
+      cache_key_icommands_packages:
+        description: The key which potentially identifies a cached build of the irods/irods_client_icommands source code.
+        required: true
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build_plugin:
+    name: Build plugin - ${{ inputs.docker_image }}
+
+    runs-on: ubuntu-latest
+    container: ${{ inputs.docker_image }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install prerequisite packages
+        run: |
+          apt-get update -qq
+          apt-get install -qq \
+            build-essential \
+            cmake \
+            git \
+            gnupg \
+            lsb-release \
+            python3-distro \
+            python3-packaging \
+            python3-pip \
+            python3-setuptools \
+            wget
+
+      - name: Set up iRODS externals package repository
+        run: |
+          mkdir -p /etc/apt/keyrings
+          wget -qO - https://unstable.irods.org/irods-unstable-signing-key.asc | \
+            gpg \
+              --no-options \
+              --no-default-keyring \
+              --no-auto-check-trustdb \
+              --homedir /dev/null \
+              --no-keyring \
+              --import-options import-export \
+              --output /etc/apt/keyrings/renci-irods-unstable-archive-keyring.pgp \
+              --import
+          echo "deb [signed-by=/etc/apt/keyrings/renci-irods-unstable-archive-keyring.pgp arch=amd64] https://unstable.irods.org/apt/ $(lsb_release -sc) main" | \
+            tee /etc/apt/sources.list.d/renci-irods-unstable.list
+
+      - name: Check cache for iRODS packages
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ inputs.cache_key_irods_packages }}
+          path: _build_irods/*.deb
+          fail-on-cache-miss: 'true'
+
+      - name: Check cache for iCommands packages
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ inputs.cache_key_icommands_packages }}
+          path: _build_icommands/*.deb
+          fail-on-cache-miss: 'true'
+
+      - name: Install iRODS development packages
+        run: |
+          apt-get update -qq
+          apt-get install -qq \
+            ./_build_irods/irods-dev*.deb \
+            ./_build_irods/irods-runtime*.deb
+
+      - name: Install iRODS python CI utilities
+        run: |
+          # TODO(#18): Investigate how to remove the need for --break-system-packages.
+          python3 -m pip install --break-system-packages git+https://github.com/irods/irods_python_ci_utilities.git@main
+
+      - name: Build and package
+        run: |
+          mkdir _build
+          python3 irods_consortium_continuous_integration_build_hook.py --build_directory _build
+
+      - name: List contents of build directory
+        run: ls -l _build
+
+      # The iRODS and iCommands packages were built and cached while inside of a docker container.
+      # We cannot use actions/cache to get the iRODS and iCommands packages in the next job because
+      # GitHub Actions ties the cache to the environment. For this workflow, the "run_tests" job does
+      # not run inside of a container. This leads to a cache miss, causing the workflow to fail. To
+      # get around that, we use actions/upload-artifact and actions/download-artifact.
+      - name: Upload iRODS packages for dependent jobs
+        uses: actions/upload-artifact@v6
+        with:
+          name: irods-packages-prerelease-${{ inputs.build_artifact_suffix }}
+          path: |
+            _build/*.deb
+            _build_irods/*.deb
+            _build_icommands/*.deb
+          overwrite: true
+
+  run_tests:
+    needs: build_plugin
+
+    name: Test plugin - ${{ inputs.irods_testing_environment_project_os }}-${{ inputs.irods_testing_environment_project_db }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # TODO(irods/irods_testing_environment#264): Remove this block once the testing environment
+      # no longer relies on the docker compose python library.
+      - name: Set up python for iRODS testing environment
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.8'
+
+      - name: Download iRODS packages
+        uses: actions/download-artifact@v7
+        with:
+          name: irods-packages-prerelease-${{ inputs.build_artifact_suffix }}
+          path: build_artifacts
+
+      - name: Set up docker compose
+        uses: docker/setup-compose-action@v1
+
+      - name: Set up iRODS testing environment
+        run: |
+          git clone -b main --depth 1 --single-branch https://github.com/irods/irods_testing_environment
+          cd irods_testing_environment
+          python3 -m venv venv_testing_env
+          . venv_testing_env/bin/activate
+          python --version
+          pip install docker-compose GitPython
+          pip install docker'<7' requests==2.26.0
+          pip freeze
+
+      - name: Run tests
+        run: |
+          # Create a symlink to the directory containing the recently built plugin packages.
+          # This is required by the irods_python_irods_ci_utilities module.
+          ln -s build_artifacts/_build "${{ inputs.plugin_package_directory }}"
+
+          # Move the icommands package into the same directory containing the server packages.
+          # This is required by the testing environment.
+          mv build_artifacts/_build_icommands/*.deb build_artifacts/_build_irods
+
+          cd irods_testing_environment
+          . venv_testing_env/bin/activate
+          project_dir="${{ inputs.irods_testing_environment_project_os }}/${{ inputs.irods_testing_environment_project_os }}-${{ inputs.irods_testing_environment_project_db }}"
+          python run_plugin_tests.py \
+            "${GITHUB_REPOSITORY#${GITHUB_REPOSITORY_OWNER}/}" \
+            --project-directory "projects/${project_dir}" \
+            --irods-package-directory ../build_artifacts/_build_irods \
+            --plugin-package-directory .. \
+            --discard-logs \
+            -v
