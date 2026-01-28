@@ -207,7 +207,15 @@ jobs:
         if: steps.irods.outputs.cache-hit != 'true' || steps.icommands.outputs.cache-hit != 'true'
         run: |
           dnf install -y ./_build_irods/irods-{dev,runtime}*.rpm
+
+          # Removing the build directory is important because actions/cache restores the parent
+          # directory (i.e. _build_icommands). If the build directory is not removed, this GHA step
+          # will fail when creating the directory.
+          #
+          # Removal of the build directory was used because it guarantees a fresh build every time.
+          rm -rf _build_icommands
           mkdir _build_icommands
+
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
