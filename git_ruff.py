@@ -21,7 +21,9 @@ import io
 import itertools
 import json
 import os
+import random
 import re
+import string
 import subprocess
 import sys
 from collections import OrderedDict
@@ -384,6 +386,23 @@ def git_diff(since_commit=None):
 	return changes
 
 
+ascii_alphanumeric = string.ascii_letters + string.digits
+
+
+def get_random_string(length=8):
+	"""
+	Generate a random alphanumeric string.
+
+	Args:
+		length: length in characters of string to generate
+
+	Returns:
+		A random string of n characters
+
+	"""
+	return ''.join(random.choices(ascii_alphanumeric, k=length))  # noqa: S311
+
+
 @contextmanager
 def emit_gha_group(title):
 	"""
@@ -399,6 +418,19 @@ def emit_gha_group(title):
 	finally:
 		if RUNNING_GHA:
 			print("::endgroup::")
+
+
+@contextmanager
+def pause_gha_commands():
+	"""Context manager function to emit GHA workflow command toggle lines to stdout."""
+	endtoken = get_random_string(length=8)
+	if RUNNING_GHA:
+		print(f"::stop-commands::{endtoken}")
+	try:
+		yield None
+	finally:
+		if RUNNING_GHA:
+			print(f"::{endtoken}::")
 
 
 def emit_gha_debug_message(message):
@@ -674,12 +706,15 @@ class RuffSuggestion:
 							sb.write(termcolor_str(space, on_color="on_green"))
 						sb.write("\n")
 
-	def generate_diff(self):
+	def generate_diff(self, sb=None):
 		"""
 		Generate diff of suggested changes.
 
+		Args:
+			sb: StringIO object to write to. Optional.
+
 		Returns:
-			String containing diff.
+			String containing diff, or None if sb was specified.
 		"""
 		if not self.changes:
 			return ""
@@ -704,13 +739,13 @@ class RuffSuggestion:
 						emit_gha_debug_message("Overlapping changes, will split diffs")
 						break
 
-		sb = io.StringIO()
+		_sb = sb or io.StringIO()
 
-		sb.write(termcolor_str("Suggestion: ", color="light_blue", attrs=["bold"]))
+		_sb.write(termcolor_str("Suggestion: ", color="light_blue", attrs=["bold"]))
 		if self.description:
-			sb.write(" ")
-			sb.write(termcolor_str(self.description, attrs=["bold"]))
-		sb.write("\n")
+			_sb.write(" ")
+			_sb.write(termcolor_str(self.description, attrs=["bold"]))
+		_sb.write("\n")
 
 		lines_old = []
 		with path.open(mode="rt", encoding="utf-8") as file:
@@ -721,13 +756,15 @@ class RuffSuggestion:
 			for change in changelist:
 				lines_new = copy.copy(lines_old)
 				self._apply_change(lines_old, lines_new, change)
-				self._write_diff(sb, lines_old, lines_new, str(path))
+				self._write_diff(_sb, lines_old, lines_new, str(path))
 		else:
 			lines_new = copy.copy(lines_old)
 			for change in reversed(changelist):
 				self._apply_change(lines_old, lines_new, change)
-			self._write_diff(sb, lines_old, lines_new, str(path))
+			self._write_diff(_sb, lines_old, lines_new, str(path))
 
+		if sb:
+			return None
 		return sb.getvalue()
 
 
@@ -916,8 +953,16 @@ class RuffResult:
 				emit_gha_message(self.level, message_props, self.summary)
 				if no_errors:
 					no_errors = self.level not in {"error", "warning"}
+		sb = io.StringIO()
+		sb_pos = sb.tell()
 		for suggestion in self.suggestions:
-			print(suggestion.generate_diff())
+			if sb.tell() > sb_pos:
+				sb.write("\n")
+				sb_pos = sb.tell()
+			suggestion.generate_diff(sb=sb)
+		if sb.tell():
+			with pause_gha_commands():
+				print(sb.getvalue())
 
 		return no_errors
 
