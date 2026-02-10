@@ -1,0 +1,10 @@
+# ruff
+.ruff_cache
+
+# python
+*.pyc
+*.pyo
+__pycache__
+
+# spyder
+.spyproject
