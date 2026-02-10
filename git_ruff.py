@@ -303,18 +303,19 @@ def convert_stdout(bytes_in):
 		return str(bytes_in)
 
 
-def git_diff(since_commit=None):
+def git_diff(since_commit=None, git_tool_path=None):
 	"""
 	Use git to generate a diff, then parse that diff to extract change locations.
 
 	Args:
 		since_commit: When specified, generated diff includes changes from commits since this commit all the way to
 			HEAD. Otherwise, generated diff includes changes from HEAD to the current working tree.
+		git_tool_path: Path to git binary
 
 	Returns:
 		Ordered dictionary of lists of LineRange objects, keyed by file as pathlib Path objects.
 	"""
-	git_diff_args = ["git"]
+	git_diff_args = ["git"] if not git_tool_path else [str(git_tool_path)]
 
 	if since_commit is None:
 		# TODO(#30): Investigate using diff-index with --cached instead of diff
@@ -471,18 +472,19 @@ def uri_to_path(uri):
 	return Path(urlunquote(urlparse(uri).path)).relative_to(Path.cwd())
 
 
-def get_check_files(git_changes):
+def get_check_files(git_changes, ruff_tool_path=None):
 	"""
 	Get changed files that Ruff would operate on.
 
 	Args:
 		git_changes: list of (or dict keyed by) changed files as pathlib Paths
+		ruff_tool_path: path to ruff binary
 
 	Yields:
 		Subset of git_changes on which ruff would operate.
 	"""
-	ruff_args = [
-		"ruff",
+	ruff_args = ["ruff"] if not ruff_tool_path else [str(ruff_tool_path)]
+	ruff_args += [
 		"check",
 		"--show-files",
 	]
@@ -503,18 +505,19 @@ def get_check_files(git_changes):
 			yield file
 
 
-def invoke_check(file):
+def invoke_check(file, ruff_tool_path=None):
 	"""
 	Invoke ruff check.
 
 	Args:
 		file: File on which to operate.
+		ruff_tool_path: path to ruff binary
 
 	Returns:
 		Sarif output from Ruff, as parsed json.
 	"""
-	ruff_args = [
-		"ruff",
+	ruff_args = ["ruff"] if not ruff_tool_path else [str(ruff_tool_path)]
+	ruff_args += [
 		"check",
 		"--no-fix",
 		"--no-fix-only",
@@ -532,19 +535,20 @@ def invoke_check(file):
 	return json.load(p.stdout)
 
 
-def invoke_format(file, region):
+def invoke_format(file, region, ruff_tool_path=None):
 	"""
 	Invoke ruff format.
 
 	Args:
 		file: File on which to operate.
 		region: Line range on which to operate.
+		ruff_tool_path: path to ruff binary
 
 	Returns:
 		Sarif output from Ruff, as parsed json.
 	"""
-	ruff_args = [
-		"ruff",
+	ruff_args = ["ruff"] if not ruff_tool_path else [str(ruff_tool_path)]
+	ruff_args += [
 		"format",
 		"--check",
 		"--preview",
@@ -1004,13 +1008,13 @@ def lint_check(args):
 	Returns:
 		Intended return code for script. 0 if no warnings or errors were emitted, -1 otherwise.
 	"""
-	git_changes = git_diff(args.since_commit)
-	check_files = get_check_files(git_changes)
+	git_changes = git_diff(since_commit=args.since_commit, git_tool_path=args.git_path)
+	check_files = get_check_files(git_changes, ruff_tool_path=args.ruff_path)
 
 	retcode = 0
 
 	for check_file in check_files:
-		checks_sarif = invoke_check(check_file)
+		checks_sarif = invoke_check(check_file, ruff_tool_path=args.ruff_path)
 
 		runs = [RuffRun(r, git_changes=git_changes) for r in checks_sarif.get("runs", [])]
 		runs = [r for r in runs if r.results] # Filter out runs with no results.
@@ -1033,14 +1037,14 @@ def lint_format(args):
 	Returns:
 		Intended return code for script. 0 if no warnings or errors were emitted, -1 otherwise.
 	"""
-	git_changes = git_diff(args.since_commit)
-	check_files = get_check_files(git_changes)
+	git_changes = git_diff(since_commit=args.since_commit, git_tool_path=args.git_path)
+	check_files = get_check_files(git_changes, ruff_tool_path=args.ruff_path)
 
 	retcode = 0
 
 	for check_file in check_files:
 		for check_range in git_changes.get(check_file, []):
-			format_sarif = invoke_format(check_file, check_range)
+			format_sarif = invoke_format(check_file, check_range, ruff_tool_path=args.ruff_path)
 
 			runs = [RuffRun(r) for r in format_sarif.get("runs", [])]
 			runs = [r for r in runs if r.results] # Filter out runs with no results.
@@ -1054,11 +1058,23 @@ def lint_format(args):
 
 
 def _add_common_arguments(argparser):
+	tools_arg_group = argparser.add_argument_group(title="Tool options")
+
 	argparser.add_argument(
-		"--since-commit",
-		help="Commit/ref to diff against, up to HEAD. Will run from HEAD to the working tree if not specified.",
-		metavar="COMMIT",
-		default=None,
+		"--since-commit", metavar="COMMIT",
+		action="store", type=str, default=None,
+		help="Commit/ref to diff against, up to HEAD. Will run from HEAD to the working tree if not specified."
+	)
+
+	tools_arg_group.add_argument(
+		"--git-path", metavar="TOOLPATH",
+		action="store", type=Path, default=None,
+		help="Path to git binary"
+	)
+	tools_arg_group.add_argument(
+		"--ruff-path", metavar="TOOLPATH",
+		action="store", type=Path, default=None,
+		help="Path to ruff binary"
 	)
 
 
