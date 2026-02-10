@@ -55,7 +55,7 @@ RE_DIFF_FILENAME = re.compile(r"^\+\+\+\ [^/]+/(.*)")
 RE_DIFF_HUNK_LINES = re.compile(r"^@@ -[0-9,]+ \+(\d+)(,(\d+))?")
 
 # This environment variable is set if we're running in a Github Action
-RUNNING_GHA = os.environ.get("GITHUB_ACTION")
+RUNNING_GHA = os.environ.get("GITHUB_ACTIONS")
 
 if RUNNING_GHA:
 	def gha_color(text, *args, **kwargs):  # noqa: ARG001
