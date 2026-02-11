@@ -26,6 +26,7 @@ import re
 import string
 import subprocess
 import sys
+import warnings
 from collections import OrderedDict
 from contextlib import contextmanager
 from pathlib import Path
@@ -37,6 +38,7 @@ from urllib.parse import (
 try:
 	from termcolor import colored as termcolor_str
 except ImportError:
+
 	def termcolor_str(text, *args, **kwargs):  # noqa: ARG001
 		"""
 		Passthrough text if termcolor is not available.
@@ -51,6 +53,24 @@ except ImportError:
 		"""
 		return text
 
+else:
+	try:
+		import importlib.metadata
+
+		from packaging.version import Version as PyVersion
+
+		termcolor_ver_wants = "2.1.0"
+		termcolor_ver_found = importlib.metadata.version("termcolor")
+
+		if PyVersion(termcolor_ver_found) < PyVersion(termcolor_ver_wants):
+			warnings.warn(  # noqa: B028
+				f"The version of termcolor installed ({termcolor_ver_found}) is older than the recommended version {termcolor_ver_wants}.",
+				category=RuntimeWarning,
+			)
+
+	except (ImportError, importlib.metadata.PackageNotFoundError):
+		warnings.warn("Could not determine the version of the termcolor module", category=RuntimeWarning)  # noqa: B028
+
 
 # For parsing diffs from git
 RE_DIFF_FILENAME = re.compile(r"^\+\+\+\ [^/]+/(.*)")
@@ -60,6 +80,7 @@ RE_DIFF_HUNK_LINES = re.compile(r"^@@ -[0-9,]+ \+(\d+)(,(\d+))?")
 RUNNING_GHA = os.environ.get("GITHUB_ACTIONS")
 
 if RUNNING_GHA:
+
 	def gha_color(text, *args, **kwargs):  # noqa: ARG001
 		"""
 		Passthrough text if running in GHA.
@@ -73,6 +94,7 @@ if RUNNING_GHA:
 			text unchanged.
 		"""
 		return text
+
 else:
 	gha_color = termcolor_str
 
@@ -454,7 +476,10 @@ def emit_gha_message(level, properties, message):
 		message: Message to emit.
 	"""
 	level = GHA_LEVELS[level]
-	props = ",".join([f"{param}={value}" for param, value in properties.items()])
+	props = gha_color(",", attrs=["dark"]).join([
+		gha_color(str(param)) + gha_color("=", attrs=["dark"]) + gha_color(str(value), attrs=["bold"])
+		for param, value in properties.items()
+	])
 	print("{} {}::{}".format(level, props, gha_color(message, attrs=["bold"])))
 
 
@@ -745,7 +770,7 @@ class RuffSuggestion:
 
 		_sb = sb or io.StringIO()
 
-		_sb.write(termcolor_str("Suggestion: ", color="light_blue", attrs=["bold"]))
+		_sb.write(termcolor_str("Suggestion: ", color="blue", attrs=["bold"]))
 		if self.description:
 			_sb.write(" ")
 			_sb.write(termcolor_str(self.description, attrs=["bold"]))
