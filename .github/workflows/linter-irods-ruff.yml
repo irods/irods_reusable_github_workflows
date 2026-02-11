@@ -27,7 +27,8 @@ jobs:
                   sudo apt-get update -qq
                   sudo apt-get install -qq apt-transport-https ca-certificates
                   sudo apt-get install -qq python3
-                  sudo pip3 install termcolor ruff --break-system-packages
+                  sudo apt-get install -qq --no-install-recommends python3-pip
+                  sudo pip3 install termcolor ruff packaging --break-system-packages
             - name: Run ruff check
               run: |
                   cd "${GITHUB_WORKSPACE}/src-repo"
@@ -52,7 +53,8 @@ jobs:
                   sudo apt-get update -qq
                   sudo apt-get install -qq apt-transport-https ca-certificates
                   sudo apt-get install -qq python3
-                  sudo pip3 install termcolor ruff --break-system-packages
+                  sudo apt-get install -qq --no-install-recommends python3-pip
+                  sudo pip3 install termcolor ruff packaging --break-system-packages
             - name: Run ruff format
               run: |
                   cd "${GITHUB_WORKSPACE}/src-repo"
