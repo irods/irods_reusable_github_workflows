@@ -26,6 +26,7 @@ import re
 import string
 import subprocess
 import sys
+import warnings
 from collections import OrderedDict
 from contextlib import contextmanager
 from pathlib import Path
@@ -33,6 +34,125 @@ from urllib.parse import (
 	unquote as urlunquote,
 	urlparse,
 )
+
+
+@functools.total_ordering
+class Version:
+	"""distutils-like Version."""
+
+	def __init__(self, vstring=None):
+		self.vstring = vstring
+		self.parse(vstring)
+
+	def __repr__(self):
+		return f"{self.__class__.__name__} ('{self}')"
+
+	def __str__(self):
+		return self.vstring
+
+	def __eq__(self, other):
+		c = self._cmp(other)
+		return c if c is NotImplemented else (c == 0)
+
+	def __lt__(self, other):
+		c = self._cmp(other)
+		return c if c is NotImplemented else (c < 0)
+
+
+class StrictVersion(Version):
+	"""distutils-like StrictVersion."""
+
+	version_re = re.compile(r"^(\d+) \. (\d+) (\. (\d+))? ([ab](\d+))?$", re.VERBOSE | re.ASCII)
+
+	def parse(self, vstring):
+		match = self.version_re.match(vstring)
+		if not match:
+			raise ValueError(f"invalid version number '{vstring}'")
+		(major, minor, patch, prerelease, prerelease_num) = match.group(1, 2, 4, 5, 6)
+		self.version = tuple(map(int, [major, minor, patch or 0]))
+		self.prerelease = (prerelease[0], int(prerelease_num)) if prerelease else None
+
+	def __hash__(self):
+		return hash((self.version, self.prerelease))
+
+	def _cmp(self, other):
+		if isinstance(other, str):
+			other = parse_version(other)
+		if isinstance(other, LooseVersion):
+			return LooseVersion(self.vstring)._cmp(other)  # noqa: SLF001
+		if not isinstance(other, StrictVersion):
+			return NotImplemented
+		if self.version == other.version:
+			return self._cmp_prerelease(other)
+		return -1 if self.version < other.version else 1
+
+	def _cmp_prerelease(self, other):
+		if self.prerelease and not other.prerelease:
+			return -1
+		if not self.prerelease and other.prerelease:
+			return 1
+		if self.prerelease == other.prerelease:
+			return 0
+		if self.prerelease < other.prerelease:
+			return -1
+		return 1
+
+
+class LooseVersion(Version):
+	"""distutils-like LooseVersion."""
+
+	component_re = re.compile(r"(\d+ | [a-z]+ | \.)", re.VERBOSE)
+
+	def parse(self, vstring):
+		components = [x for x in self.component_re.split(vstring) if x and x != "."]
+		for i, obj in enumerate(components):
+			try:
+				components[i] = int(obj)
+			except ValueError:  # noqa: PERF203
+				components[i] = 0 if obj == '' else obj.lstrip("0")
+		self.version = components
+
+	def __hash__(self):
+		return hash(self.version)
+
+	def _cmp(self, other):
+		if isinstance(other, str):
+			other = LooseVersion(other)
+		if isinstance(other, StrictVersion):
+			other = LooseVersion(other.vstring)
+		elif not isinstance(other, LooseVersion):
+			return NotImplemented
+		if len(self.version) > len(other.version):
+			v1 = self.version
+			v2 = other.version
+			retmult = 1
+		else:
+			v1 = other.version
+			v2 = self.version
+			retmult = -1
+		for c1, c2 in itertools.zip_longest(v1, v2):
+			if c1 == c2:
+				continue
+			try:
+				if c1 > c2:
+					return (1 if c1 > c2 else -1) * retmult
+			except TypeError:
+				if c2 is None:
+					if c1 == 0:
+						continue
+					return 1 * retmult
+				c1 = str(c1)  # noqa: PLW2901
+				c2 = str(c2)  # noqa: PLW2901
+				return (1 if c1 > c2 else -1) * retmult
+		return 0
+
+
+def parse_version(vstring):
+	try:
+		return StrictVersion(vstring)
+	except ValueError:
+		return LooseVersion(vstring)
+
 
 try:
 	from termcolor import colored as termcolor_str
@@ -50,6 +170,18 @@ except ImportError:
 			text unchanged.
 		"""
 		return text
+else:
+	try:
+		import importlib.metadata
+		termcolor_ver_wants = "2.1.0"
+		termcolor_ver_found = importlib.metadata.version("termcolor")
+		if parse_version(termcolor_ver_found) < parse_version(termcolor_ver_wants):
+			warnings.warn(  # noqa: B028
+				f"The version of termcolor installed ({termcolor_ver_found}) is older than the recommended version {termcolor_ver_wants}.",
+				category=RuntimeWarning,
+			)
+	except importlib.metadata.PackageNotFoundError:
+		warnings.warn("Could not determine the version of the termcolor module", category=RuntimeWarning)  # noqa: B028
 
 
 # For parsing diffs from git
@@ -454,7 +586,10 @@ def emit_gha_message(level, properties, message):
 		message: Message to emit.
 	"""
 	level = GHA_LEVELS[level]
-	props = ",".join([f"{param}={value}" for param, value in properties.items()])
+	props = gha_color(",", attrs=["dark"]).join([
+		gha_color(str(param)) + gha_color("=", attrs=["dark"]) + gha_color(str(value), attrs=["bold"])
+		for param, value in properties.items()
+	])
 	print("{} {}::{}".format(level, props, gha_color(message, attrs=["bold"])))
 
 
@@ -745,7 +880,7 @@ class RuffSuggestion:
 
 		_sb = sb or io.StringIO()
 
-		_sb.write(termcolor_str("Suggestion: ", color="light_blue", attrs=["bold"]))
+		_sb.write(termcolor_str("Suggestion: ", color="blue", attrs=["bold"]))
 		if self.description:
 			_sb.write(" ")
 			_sb.write(termcolor_str(self.description, attrs=["bold"]))
