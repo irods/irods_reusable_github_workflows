@@ -21,9 +21,12 @@ import io
 import itertools
 import json
 import os
+import random
 import re
+import string
 import subprocess
 import sys
+import warnings
 from collections import OrderedDict
 from contextlib import contextmanager
 from pathlib import Path
@@ -31,6 +34,125 @@ from urllib.parse import (
 	unquote as urlunquote,
 	urlparse,
 )
+
+
+@functools.total_ordering
+class Version:
+	"""distutils-like Version."""
+
+	def __init__(self, vstring=None):
+		self.vstring = vstring
+		self.parse(vstring)
+
+	def __repr__(self):
+		return f"{self.__class__.__name__} ('{self}')"
+
+	def __str__(self):
+		return self.vstring
+
+	def __eq__(self, other):
+		c = self._cmp(other)
+		return c if c is NotImplemented else (c == 0)
+
+	def __lt__(self, other):
+		c = self._cmp(other)
+		return c if c is NotImplemented else (c < 0)
+
+
+class StrictVersion(Version):
+	"""distutils-like StrictVersion."""
+
+	version_re = re.compile(r"^(\d+) \. (\d+) (\. (\d+))? ([ab](\d+))?$", re.VERBOSE | re.ASCII)
+
+	def parse(self, vstring):
+		match = self.version_re.match(vstring)
+		if not match:
+			raise ValueError(f"invalid version number '{vstring}'")
+		(major, minor, patch, prerelease, prerelease_num) = match.group(1, 2, 4, 5, 6)
+		self.version = tuple(map(int, [major, minor, patch or 0]))
+		self.prerelease = (prerelease[0], int(prerelease_num)) if prerelease else None
+
+	def __hash__(self):
+		return hash((self.version, self.prerelease))
+
+	def _cmp(self, other):
+		if isinstance(other, str):
+			other = parse_version(other)
+		if isinstance(other, LooseVersion):
+			return LooseVersion(self.vstring)._cmp(other)  # noqa: SLF001
+		if not isinstance(other, StrictVersion):
+			return NotImplemented
+		if self.version == other.version:
+			return self._cmp_prerelease(other)
+		return -1 if self.version < other.version else 1
+
+	def _cmp_prerelease(self, other):
+		if self.prerelease and not other.prerelease:
+			return -1
+		if not self.prerelease and other.prerelease:
+			return 1
+		if self.prerelease == other.prerelease:
+			return 0
+		if self.prerelease < other.prerelease:
+			return -1
+		return 1
+
+
+class LooseVersion(Version):
+	"""distutils-like LooseVersion."""
+
+	component_re = re.compile(r"(\d+ | [a-z]+ | \.)", re.VERBOSE)
+
+	def parse(self, vstring):
+		components = [x for x in self.component_re.split(vstring) if x and x != "."]
+		for i, obj in enumerate(components):
+			try:
+				components[i] = int(obj)
+			except ValueError:  # noqa: PERF203
+				components[i] = 0 if obj == '' else obj.lstrip("0")
+		self.version = components
+
+	def __hash__(self):
+		return hash(self.version)
+
+	def _cmp(self, other):
+		if isinstance(other, str):
+			other = LooseVersion(other)
+		if isinstance(other, StrictVersion):
+			other = LooseVersion(other.vstring)
+		elif not isinstance(other, LooseVersion):
+			return NotImplemented
+		if len(self.version) > len(other.version):
+			v1 = self.version
+			v2 = other.version
+			retmult = 1
+		else:
+			v1 = other.version
+			v2 = self.version
+			retmult = -1
+		for c1, c2 in itertools.zip_longest(v1, v2):
+			if c1 == c2:
+				continue
+			try:
+				if c1 > c2:
+					return (1 if c1 > c2 else -1) * retmult
+			except TypeError:
+				if c2 is None:
+					if c1 == 0:
+						continue
+					return 1 * retmult
+				c1 = str(c1)  # noqa: PLW2901
+				c2 = str(c2)  # noqa: PLW2901
+				return (1 if c1 > c2 else -1) * retmult
+		return 0
+
+
+def parse_version(vstring):
+	try:
+		return StrictVersion(vstring)
+	except ValueError:
+		return LooseVersion(vstring)
+
 
 try:
 	from termcolor import colored as termcolor_str
@@ -48,6 +170,18 @@ except ImportError:
 			text unchanged.
 		"""
 		return text
+else:
+	try:
+		import importlib.metadata
+		termcolor_ver_wants = "2.1.0"
+		termcolor_ver_found = importlib.metadata.version("termcolor")
+		if parse_version(termcolor_ver_found) < parse_version(termcolor_ver_wants):
+			warnings.warn(  # noqa: B028
+				f"The version of termcolor installed ({termcolor_ver_found}) is older than the recommended version {termcolor_ver_wants}.",
+				category=RuntimeWarning,
+			)
+	except importlib.metadata.PackageNotFoundError:
+		warnings.warn("Could not determine the version of the termcolor module", category=RuntimeWarning)  # noqa: B028
 
 
 # For parsing diffs from git
@@ -55,7 +189,7 @@ RE_DIFF_FILENAME = re.compile(r"^\+\+\+\ [^/]+/(.*)")
 RE_DIFF_HUNK_LINES = re.compile(r"^@@ -[0-9,]+ \+(\d+)(,(\d+))?")
 
 # This environment variable is set if we're running in a Github Action
-RUNNING_GHA = os.environ.get("GITHUB_ACTION")
+RUNNING_GHA = os.environ.get("GITHUB_ACTIONS")
 
 if RUNNING_GHA:
 	def gha_color(text, *args, **kwargs):  # noqa: ARG001
@@ -301,18 +435,19 @@ def convert_stdout(bytes_in):
 		return str(bytes_in)
 
 
-def git_diff(since_commit=None):
+def git_diff(since_commit=None, tool_path=None):
 	"""
 	Use git to generate a diff, then parse that diff to extract change locations.
 
 	Args:
 		since_commit: When specified, generated diff includes changes from commits since this commit all the way to
 			HEAD. Otherwise, generated diff includes changes from HEAD to the current working tree.
+		tool_path: Path to git binary
 
 	Returns:
 		Ordered dictionary of lists of LineRange objects, keyed by file as pathlib Path objects.
 	"""
-	git_diff_args = ["git"]
+	git_diff_args = ["git"] if not tool_path else [str(tool_path)]
 
 	if since_commit is None:
 		# TODO(#30): Investigate using diff-index with --cached instead of diff
@@ -384,6 +519,23 @@ def git_diff(since_commit=None):
 	return changes
 
 
+ascii_alphanumeric = string.ascii_letters + string.digits
+
+
+def get_random_string(n=8):
+	"""
+	Generate a random alphanumeric string.
+
+	Args:
+		n: length in characters of string to generate
+
+	Returns:
+		A random string of n characters
+
+	"""
+	return ''.join(random.choices(ascii_alphanumeric, k=n))  # noqa: S311
+
+
 @contextmanager
 def emit_gha_group(title):
 	"""
@@ -399,6 +551,19 @@ def emit_gha_group(title):
 	finally:
 		if RUNNING_GHA:
 			print("::endgroup::")
+
+
+@contextmanager
+def pause_gha_commands():
+	"""Context manager function to emit GHA workflow command toggle lines to stdout."""
+	endtoken = get_random_string(n=8)
+	if RUNNING_GHA:
+		print(f"::stop-commands::{endtoken}")
+	try:
+		yield None
+	finally:
+		if RUNNING_GHA:
+			print(f"::{endtoken}::")
 
 
 def emit_gha_debug_message(message):
@@ -421,7 +586,10 @@ def emit_gha_message(level, properties, message):
 		message: Message to emit.
 	"""
 	level = GHA_LEVELS[level]
-	props = ",".join([f"{param}={value}" for param, value in properties.items()])
+	props = gha_color(",", attrs=["dark"]).join([
+		gha_color(str(param)) + gha_color("=", attrs=["dark"]) + gha_color(str(value), attrs=["bold"])
+		for param, value in properties.items()
+	])
 	print("{} {}::{}".format(level, props, gha_color(message, attrs=["bold"])))
 
 
@@ -439,18 +607,19 @@ def uri_to_path(uri):
 	return Path(urlunquote(urlparse(uri).path)).relative_to(Path.cwd())
 
 
-def get_check_files(git_changes):
+def get_check_files(git_changes, tool_path=None):
 	"""
 	Get changed files that Ruff would operate on.
 
 	Args:
 		git_changes: list of (or dict keyed by) changed files as pathlib Paths
+		tool_path: path to ruff binary
 
 	Yields:
 		Subset of git_changes on which ruff would operate.
 	"""
-	ruff_args = [
-		"ruff",
+	ruff_args = ["ruff"] if not tool_path else [str(tool_path)]
+	ruff_args += [
 		"check",
 		"--show-files",
 	]
@@ -471,18 +640,19 @@ def get_check_files(git_changes):
 			yield file
 
 
-def invoke_check(file):
+def invoke_check(file, tool_path=None):
 	"""
 	Invoke ruff check.
 
 	Args:
 		file: File on which to operate.
+		tool_path: path to ruff binary
 
 	Returns:
 		Sarif output from Ruff, as parsed json.
 	"""
-	ruff_args = [
-		"ruff",
+	ruff_args = ["ruff"] if not tool_path else [str(tool_path)]
+	ruff_args += [
 		"check",
 		"--no-fix",
 		"--no-fix-only",
@@ -500,19 +670,20 @@ def invoke_check(file):
 	return json.load(p.stdout)
 
 
-def invoke_format(file, region):
+def invoke_format(file, region, tool_path=None):
 	"""
 	Invoke ruff format.
 
 	Args:
 		file: File on which to operate.
 		region: Line range on which to operate.
+		tool_path: path to ruff binary
 
 	Returns:
 		Sarif output from Ruff, as parsed json.
 	"""
-	ruff_args = [
-		"ruff",
+	ruff_args = ["ruff"] if not tool_path else [str(tool_path)]
+	ruff_args += [
 		"format",
 		"--check",
 		"--preview",
@@ -674,12 +845,15 @@ class RuffSuggestion:
 							sb.write(termcolor_str(space, on_color="on_green"))
 						sb.write("\n")
 
-	def generate_diff(self):
+	def generate_diff(self, sb=None):
 		"""
 		Generate diff of suggested changes.
 
+		Args:
+			sb: StringIO object to write to. Optional.
+
 		Returns:
-			String containing diff.
+			String containing diff, or None if sb was specified.
 		"""
 		if not self.changes:
 			return ""
@@ -704,13 +878,13 @@ class RuffSuggestion:
 						emit_gha_debug_message("Overlapping changes, will split diffs")
 						break
 
-		sb = io.StringIO()
+		_sb = sb or io.StringIO()
 
-		sb.write(termcolor_str("Suggestion: ", color="light_blue", attrs=["bold"]))
+		_sb.write(termcolor_str("Suggestion: ", color="blue", attrs=["bold"]))
 		if self.description:
-			sb.write(" ")
-			sb.write(termcolor_str(self.description, attrs=["bold"]))
-		sb.write("\n")
+			_sb.write(" ")
+			_sb.write(termcolor_str(self.description, attrs=["bold"]))
+		_sb.write("\n")
 
 		lines_old = []
 		with path.open(mode="rt", encoding="utf-8") as file:
@@ -721,13 +895,15 @@ class RuffSuggestion:
 			for change in changelist:
 				lines_new = copy.copy(lines_old)
 				self._apply_change(lines_old, lines_new, change)
-				self._write_diff(sb, lines_old, lines_new, str(path))
+				self._write_diff(_sb, lines_old, lines_new, str(path))
 		else:
 			lines_new = copy.copy(lines_old)
 			for change in reversed(changelist):
 				self._apply_change(lines_old, lines_new, change)
-			self._write_diff(sb, lines_old, lines_new, str(path))
+			self._write_diff(_sb, lines_old, lines_new, str(path))
 
+		if sb:
+			return None
 		return sb.getvalue()
 
 
@@ -916,8 +1092,16 @@ class RuffResult:
 				emit_gha_message(self.level, message_props, self.summary)
 				if no_errors:
 					no_errors = self.level not in {"error", "warning"}
+		sb = io.StringIO()
+		sb_pos = sb.tell()
 		for suggestion in self.suggestions:
-			print(suggestion.generate_diff())
+			if sb.tell() > sb_pos:
+				sb.write("\n")
+				sb_pos = sb.tell()
+			suggestion.generate_diff(sb=sb)
+		if sb.tell():
+			with pause_gha_commands():
+				print(sb.getvalue())
 
 		return no_errors
 
@@ -959,13 +1143,13 @@ def lint_check(args):
 	Returns:
 		Intended return code for script. 0 if no warnings or errors were emitted, -1 otherwise.
 	"""
-	git_changes = git_diff(args.since_commit)
-	check_files = get_check_files(git_changes)
+	git_changes = git_diff(since_commit=args.since_commit, tool_path=args.git_path)
+	check_files = get_check_files(git_changes, tool_path=args.ruff_path)
 
 	retcode = 0
 
 	for check_file in check_files:
-		checks_sarif = invoke_check(check_file)
+		checks_sarif = invoke_check(check_file, tool_path=args.ruff_path)
 
 		runs = [RuffRun(r, git_changes=git_changes) for r in checks_sarif.get("runs", [])]
 		runs = [r for r in runs if r.results] # Filter out runs with no results.
@@ -988,14 +1172,14 @@ def lint_format(args):
 	Returns:
 		Intended return code for script. 0 if no warnings or errors were emitted, -1 otherwise.
 	"""
-	git_changes = git_diff(args.since_commit)
-	check_files = get_check_files(git_changes)
+	git_changes = git_diff(since_commit=args.since_commit, tool_path=args.git_path)
+	check_files = get_check_files(git_changes, tool_path=args.ruff_path)
 
 	retcode = 0
 
 	for check_file in check_files:
 		for check_range in git_changes.get(check_file, []):
-			format_sarif = invoke_format(check_file, check_range)
+			format_sarif = invoke_format(check_file, check_range, tool_path=args.ruff_path)
 
 			runs = [RuffRun(r) for r in format_sarif.get("runs", [])]
 			runs = [r for r in runs if r.results] # Filter out runs with no results.
@@ -1009,11 +1193,23 @@ def lint_format(args):
 
 
 def _add_common_arguments(argparser):
+	tools_arg_group = argparser.add_argument_group(title="Tool options")
+
 	argparser.add_argument(
-		"--since-commit",
-		help="Commit/ref to diff against, up to HEAD. Will run from HEAD to the working tree if not specified.",
-		metavar="COMMIT",
-		default=None,
+		"--since-commit", metavar="COMMIT",
+		action="store", type=str, default=None,
+		help="Commit/ref to diff against, up to HEAD. Will run from HEAD to the working tree if not specified."
+	)
+
+	tools_arg_group.add_argument(
+		"--git-path", metavar="TOOLPATH",
+		action="store", type=Path, default=None,
+		help="Path to git binary"
+	)
+	tools_arg_group.add_argument(
+		"--ruff-path", metavar="TOOLPATH",
+		action="store", type=Path, default=None,
+		help="Path to ruff binary"
 	)
 
 
