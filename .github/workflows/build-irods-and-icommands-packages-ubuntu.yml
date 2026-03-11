@@ -1,5 +1,4 @@
-# This workflow compiles the main branches of the irods/irods and
-# irods/irods_client_icommands GitHub repositories.
+# This workflow compiles the main branch of the irods/irods GitHub repository.
 #
 # Newly built iRODS packages are stored as artifacts for other jobs and
 # workflows to use. This workflow also produces various pieces of information
@@ -18,10 +17,6 @@ on:
         type: string
       cache_key_irods_packages_prefix:
         description: The key which potentially identifies a cached build of the irods/irods source code.
-        required: true
-        type: string
-      cache_key_icommands_packages_prefix:
-        description: The key which potentially identifies a cached build of the irods/irods_client_icommands source code.
         required: true
         type: string
       ccache_key:
@@ -60,12 +55,8 @@ on:
         value: ${{ jobs.build_irods_and_icommands.outputs.irods_testing_environment_project_db }}
       build_sha_irods:
         value: ${{ jobs.build_irods_and_icommands.outputs.sha_irods }}
-      build_sha_icommands:
-        value: ${{ jobs.build_irods_and_icommands.outputs.sha_icommands }}
       cache_key_irods_packages:
         value: ${{ jobs.build_irods_and_icommands.outputs.cache_key_irods_packages }}
-      cache_key_icommands_packages:
-        value: ${{ jobs.build_irods_and_icommands.outputs.cache_key_icommands_packages }}
 
 defaults:
   run:
@@ -86,9 +77,7 @@ jobs:
       irods_testing_environment_project_os: ${{ inputs.irods_testing_environment_project_os }}
       irods_testing_environment_project_db: ${{ inputs.irods_testing_environment_project_db }}
       build_sha_irods: ${{ steps.init.outputs.sha_irods }}
-      build_sha_icommands: ${{ steps.init.outputs.sha_icommands }}
       cache_key_irods_packages: ${{ steps.init.outputs.cache_key_irods_packages }}
-      cache_key_icommands_packages: ${{ steps.init.outputs.cache_key_icommands_packages }}
 
     steps:
       - name: Generate keys for caching newly built iRODS packages
@@ -98,17 +87,13 @@ jobs:
           apt-get install -qq git
 
           git clone -b main --depth 1 --single-branch https://github.com/irods/irods
-          git clone -b main --depth 1 --single-branch https://github.com/irods/irods_client_icommands
 
           # Make SHAs available to other steps and jobs within the workflow.
           sha_irods=$(git -C irods rev-parse HEAD)
-          sha_icmds=$(git -C irods_client_icommands rev-parse HEAD)
           echo "sha_irods=$sha_irods" >> $GITHUB_OUTPUT
-          echo "sha_icommands=$sha_icmds" >> $GITHUB_OUTPUT
 
           # Initialize keys for caching unreleased packages.
           echo "cache_key_irods_packages=${{ inputs.cache_key_irods_packages_prefix }}-$sha_irods" >> $GITHUB_OUTPUT
-          echo "cache_key_icommands_packages=${{ inputs.cache_key_icommands_packages_prefix }}-$sha_icmds" >> $GITHUB_OUTPUT
 
       - name: Check cache for iRODS packages
         id: irods
@@ -117,15 +102,8 @@ jobs:
           key: ${{ steps.init.outputs.cache_key_irods_packages }}
           path: _build_irods/*.deb
 
-      - name: Check cache for iCommands package
-        id: icommands
-        uses: actions/cache@v4
-        with:
-          key: ${{ steps.init.outputs.cache_key_icommands_packages }}
-          path: _build_icommands/*.deb
-
       - name: Install prerequisite packages
-        if: steps.irods.outputs.cache-hit != 'true' || steps.icommands.outputs.cache-hit != 'true'
+        if: steps.irods.outputs.cache-hit != 'true'
         run: |
           apt-get update -qq
           apt-get install -qq \
@@ -161,7 +139,7 @@ jobs:
             zlib1g-dev
 
       - name: Set up iRODS externals package repository
-        if: steps.irods.outputs.cache-hit != 'true' || steps.icommands.outputs.cache-hit != 'true'
+        if: steps.irods.outputs.cache-hit != 'true'
         run: |
           mkdir -p /etc/apt/keyrings
           wget -qO - https://unstable.irods.org/irods-unstable-signing-key.asc | \
@@ -184,14 +162,14 @@ jobs:
             irods-externals-nanodbc2.13.0-3
 
       - name: Configure ccache
-        if: steps.irods.outputs.cache-hit != 'true' || steps.icommands.outputs.cache-hit != 'true'
+        if: steps.irods.outputs.cache-hit != 'true'
         run: |
           apt-get install -qq ccache
           echo "CCACHE_DIR=/irods_build_cache" >> $GITHUB_ENV
           echo "CCACHE_MAXSIZE=1G" >> $GITHUB_ENV
 
       - name: Restore ccache state
-        if: steps.irods.outputs.cache-hit != 'true' || steps.icommands.outputs.cache-hit != 'true'
+        if: steps.irods.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           key: ${{ inputs.ccache_key }}
@@ -209,29 +187,3 @@ jobs:
             -B _build_irods \
             -S irods
           cmake --build _build_irods --target package
-
-      - name: Build iCommands packages
-        # The iRODS cache hit condition (i.e. steps.irods.outputs.cache-hit) exists to make sure
-        # the iCommands are always compiled against the newly built iRODS packages. This avoids
-        # ABI issues on the iRODS code level. If ABI stability ever becomes a requirement for iRODS,
-        # then we can consider removing the condition for the iRODS cache hit condition.
-        if: steps.irods.outputs.cache-hit != 'true' || steps.icommands.outputs.cache-hit != 'true'
-        run: |
-          apt-get install -qq ./_build_irods/irods-{dev,runtime}*.deb
-
-          # Removing the build directory is important because actions/cache restores the parent
-          # directory (i.e. _build_icommands). If the build directory is not removed, this GHA step
-          # will fail when creating the directory.
-          #
-          # Removal of the build directory was used because it guarantees a fresh build every time.
-          rm -rf _build_icommands
-          mkdir _build_icommands
-
-          cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -GNinja \
-            -B _build_icommands \
-            -S irods_client_icommands
-          cmake --build _build_icommands --target package
