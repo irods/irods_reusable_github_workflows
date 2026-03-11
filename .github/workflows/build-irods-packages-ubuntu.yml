@@ -6,7 +6,7 @@
 #
 # This particular workflow targets Ubuntu platforms.
 
-name: build-irods-and-icommands-packages-ubuntu
+name: Build iRODS packages (prerelease) (Ubuntu)
 
 on:
   workflow_call:
@@ -64,7 +64,7 @@ defaults:
 
 jobs:
   build_irods_and_icommands:
-    name: Build iRODS and iCommands packages - ${{ inputs.docker_image }}
+    name: "Build iRODS packages: ${{ inputs.docker_image }}"
 
     runs-on: ubuntu-latest
     container: ${{ inputs.docker_image }}

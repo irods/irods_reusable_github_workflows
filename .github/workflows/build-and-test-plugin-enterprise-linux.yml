@@ -1,4 +1,4 @@
-name: build-and-test-plugin-enterprise-linux
+name: Build/Test plugin (Enterprise Linux)
 
 on:
   workflow_call:
@@ -34,7 +34,7 @@ defaults:
 
 jobs:
   build_plugin:
-    name: Build - ${{ inputs.irods_package_version }}, ${{ inputs.docker_image }}
+    name: "Build: ${{ inputs.irods_package_version }}, ${{ inputs.docker_image }}"
 
     runs-on: ubuntu-latest
     container: ${{ inputs.docker_image }}
@@ -96,7 +96,7 @@ jobs:
   run_tests:
     needs: build_plugin
 
-    name: Test - ${{ inputs.irods_package_version }}, ${{ inputs.irods_testing_environment_project_os }}, ${{ inputs.irods_testing_environment_project_db }}
+    name: "Test: ${{ inputs.irods_package_version }}, ${{ inputs.irods_testing_environment_project_os }}, ${{ inputs.irods_testing_environment_project_db }}"
 
     runs-on: ubuntu-latest
 

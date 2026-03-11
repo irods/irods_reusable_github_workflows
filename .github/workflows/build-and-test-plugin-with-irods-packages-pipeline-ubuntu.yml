@@ -3,7 +3,7 @@
 #
 # This particular workflow targets Ubuntu platforms.
 
-name: build-and-test-plugin-with-irods-packages-pipeline-ubuntu
+name: Build/Test plugin w/ iRODS packages pipeline (Ubuntu)
 
 on:
   workflow_call:
@@ -43,7 +43,7 @@ defaults:
 
 jobs:
   build_irods_packages:
-    uses: irods/irods_reusable_github_workflows/.github/workflows/build-irods-and-icommands-packages-ubuntu.yml@main
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-irods-packages-ubuntu.yml@main
     with:
       docker_image: ${{ inputs.docker_image }}
       cache_key_irods_packages_prefix: ${{ inputs.cache_key_irods_packages_prefix }}

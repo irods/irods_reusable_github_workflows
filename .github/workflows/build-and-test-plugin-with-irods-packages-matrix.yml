@@ -7,7 +7,7 @@
 # - https://github.com/irods/irods_development_environment#how-to-build-an-irods-plugin
 # - https://github.com/irods/irods_testing_environment#run-irods-plugin-tests
 
-name: build-and-test-plugin-with-irods-packages-matrix
+name: Build/Test plugins w/ iRODS packages
 
 on:
   workflow_call:
