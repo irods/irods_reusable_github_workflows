@@ -32,10 +32,6 @@ on:
         description: The key which potentially identifies a cached build of the irods/irods source code.
         required: true
         type: string
-      cache_key_icommands_packages:
-        description: The key which potentially identifies a cached build of the irods/irods_client_icommands source code.
-        required: true
-        type: string
 
 defaults:
   run:
@@ -82,13 +78,6 @@ jobs:
           path: _build_irods/*.rpm
           fail-on-cache-miss: 'true'
 
-      - name: Check cache for iCommands packages
-        uses: actions/cache/restore@v4
-        with:
-          key: ${{ inputs.cache_key_icommands_packages }}
-          path: _build_icommands/*.rpm
-          fail-on-cache-miss: 'true'
-
       - name: Install iRODS development packages
         run: |
           dnf update -y
@@ -120,7 +109,6 @@ jobs:
           path: |
             _build/*.rpm
             _build_irods/*.rpm
-            _build_icommands/*.rpm
           overwrite: true
 
   run_tests:
@@ -166,10 +154,6 @@ jobs:
           # Create a symlink to the directory containing the recently built plugin packages.
           # This is required by the irods_python_irods_ci_utilities module.
           ln -s build_artifacts/_build "${{ inputs.plugin_package_directory }}"
-
-          # Move the icommands package into the same directory containing the server packages.
-          # This is required by the testing environment.
-          mv build_artifacts/_build_icommands/*.rpm build_artifacts/_build_irods
 
           cd irods_testing_environment
           . venv_testing_env/bin/activate

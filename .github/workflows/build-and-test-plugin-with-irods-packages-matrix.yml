@@ -35,7 +35,6 @@ jobs:
           # Debian 12
           - docker_image: debian:12
             cache_key_irods_packages_prefix: cache-irods-debian-12
-            cache_key_icommands_packages_prefix: cache-icommands-debian-12
             ccache_key: ccache-irods-debian-12
             build_artifact_suffix: debian_12-main
             plugin_package_directory: 'Debian gnu_linux_12'
@@ -45,7 +44,6 @@ jobs:
           # Debian 13
           - docker_image: debian:13
             cache_key_irods_packages_prefix: cache-irods-debian-13
-            cache_key_icommands_packages_prefix: cache-icommands-debian-13
             ccache_key: ccache-irods-debian-13
             build_artifact_suffix: debian_13-main
             plugin_package_directory: 'Debian gnu_linux_13'
@@ -56,7 +54,6 @@ jobs:
     with:
       docker_image: ${{ matrix.docker_image }}
       cache_key_irods_packages_prefix: ${{ matrix.cache_key_irods_packages_prefix }}
-      cache_key_icommands_packages_prefix: ${{ matrix.cache_key_icommands_packages_prefix }}
       ccache_key: ${{ matrix.ccache_key }}
       build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
       plugin_package_directory: ${{ matrix.plugin_package_directory }}
@@ -70,7 +67,6 @@ jobs:
           # EL9
           - docker_image: rockylinux/rockylinux:9
             cache_key_irods_packages_prefix: cache-irods-el9
-            cache_key_icommands_packages_prefix: cache-icommands-el9
             ccache_key: ccache-irods-el9
             build_artifact_suffix: rockylinux_9-main
             plugin_package_directory: 'Rocky linux_9'
@@ -80,7 +76,6 @@ jobs:
           # EL10
           - docker_image: rockylinux/rockylinux:10
             cache_key_irods_packages_prefix: cache-irods-el10
-            cache_key_icommands_packages_prefix: cache-icommands-el10
             ccache_key: ccache-irods-el10
             build_artifact_suffix: rockylinux_10-main
             plugin_package_directory: 'Rocky linux_10'
@@ -91,7 +86,6 @@ jobs:
     with:
       docker_image: ${{ matrix.docker_image }}
       cache_key_irods_packages_prefix: ${{ matrix.cache_key_irods_packages_prefix }}
-      cache_key_icommands_packages_prefix: ${{ matrix.cache_key_icommands_packages_prefix }}
       ccache_key: ${{ matrix.ccache_key }}
       build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
       plugin_package_directory: ${{ matrix.plugin_package_directory }}
@@ -105,7 +99,6 @@ jobs:
           # Ubuntu 22.04
           - docker_image: ubuntu:22.04
             cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04
-            cache_key_icommands_packages_prefix: cache-icommands-ubuntu-22.04
             ccache_key: ccache-irods-ubuntu-22.04
             build_artifact_suffix: ubuntu_22-main
             plugin_package_directory: Ubuntu_22
@@ -115,7 +108,6 @@ jobs:
           # Ubuntu 24.04
           - docker_image: ubuntu:24.04
             cache_key_irods_packages_prefix: cache-irods-ubuntu-24.04
-            cache_key_icommands_packages_prefix: cache-icommands-ubuntu-24.04
             ccache_key: ccache-irods-ubuntu-24.04
             build_artifact_suffix: ubuntu_24-main
             plugin_package_directory: Ubuntu_24
@@ -126,7 +118,6 @@ jobs:
     with:
       docker_image: ${{ matrix.docker_image }}
       cache_key_irods_packages_prefix: ${{ matrix.cache_key_irods_packages_prefix }}
-      cache_key_icommands_packages_prefix: ${{ matrix.cache_key_icommands_packages_prefix }}
       ccache_key: ${{ matrix.ccache_key }}
       build_artifact_suffix: ${{ matrix.build_artifact_suffix }}
       plugin_package_directory: ${{ matrix.plugin_package_directory }}
@@ -141,7 +132,6 @@ jobs:
     with:
       docker_image: ubuntu:22.04
       cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04
-      cache_key_icommands_packages_prefix: cache-icommands-ubuntu-22.04
       ccache_key: ccache-irods-ubuntu-22.04
       build_artifact_suffix: ubuntu_22-main
       plugin_package_directory: Ubuntu_22
@@ -156,7 +146,6 @@ jobs:
     with:
       docker_image: ubuntu:22.04
       cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04
-      cache_key_icommands_packages_prefix: cache-icommands-ubuntu-22.04
       ccache_key: ccache-irods-ubuntu-22.04
       build_artifact_suffix: ubuntu_22-main
       plugin_package_directory: Ubuntu_22
