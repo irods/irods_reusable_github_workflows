@@ -122,13 +122,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      # TODO(irods/irods_testing_environment#264): Remove this block once the testing environment
-      # no longer relies on the docker compose python library.
-      - name: Set up python for iRODS testing environment
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.8'
-
       - name: Download iRODS packages
         uses: actions/download-artifact@v7
         with:
@@ -145,8 +138,7 @@ jobs:
           python3 -m venv venv_testing_env
           . venv_testing_env/bin/activate
           python --version
-          pip install docker-compose GitPython
-          pip install docker'<7' requests==2.26.0
+          pip install docker GitPython cryptography
           pip freeze
 
       - name: Run tests
