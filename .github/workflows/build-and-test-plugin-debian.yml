@@ -99,7 +99,6 @@ jobs:
         with:
           name: build_output-${{ inputs.build_artifact_suffix }}
           path: _build/*.deb
-          retention-days: 1
           overwrite: true
 
   run_tests:
