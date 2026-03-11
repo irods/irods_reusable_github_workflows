@@ -113,11 +113,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up python for iRODS testing environment
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.8'
-
       - name: Download build output
         uses: actions/download-artifact@v7
         with:
@@ -134,8 +129,7 @@ jobs:
           python3 -m venv venv_testing_env
           . venv_testing_env/bin/activate
           python --version
-          pip install docker-compose GitPython
-          pip install docker'<7' requests==2.26.0
+          pip install docker GitPython cryptography
           pip freeze
 
       - name: Run tests
