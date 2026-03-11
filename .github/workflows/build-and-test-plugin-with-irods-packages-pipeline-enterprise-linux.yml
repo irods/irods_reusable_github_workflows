@@ -3,7 +3,7 @@
 #
 # This particular workflow targets Enterprise Linux platforms.
 
-name: build-and-test-plugin-with-irods-packages-pipeline-enterprise-linux
+name: Build/Test plugin w/ iRODS packages pipeline (Enterprise Linux)
 
 on:
   workflow_call:
@@ -43,7 +43,7 @@ defaults:
 
 jobs:
   build_irods_packages:
-    uses: irods/irods_reusable_github_workflows/.github/workflows/build-irods-and-icommands-packages-enterprise-linux.yml@main
+    uses: irods/irods_reusable_github_workflows/.github/workflows/build-irods-packages-enterprise-linux.yml@main
     with:
       docker_image: ${{ inputs.docker_image }}
       cache_key_irods_packages_prefix: ${{ inputs.cache_key_irods_packages_prefix }}
