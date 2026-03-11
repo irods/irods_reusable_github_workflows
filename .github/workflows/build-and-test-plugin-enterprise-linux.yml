@@ -115,7 +115,7 @@ jobs:
 
       - name: Set up iRODS testing environment
         run: |
-          git clone https://github.com/irods/irods_testing_environment
+          git clone -b main --depth 1 --single-branch https://github.com/irods/irods_testing_environment
           cd irods_testing_environment
           python3 -m venv venv_testing_env
           . venv_testing_env/bin/activate
