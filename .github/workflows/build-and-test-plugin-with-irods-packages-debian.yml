@@ -156,13 +156,42 @@ jobs:
           # This is required by the irods_python_irods_ci_utilities module.
           ln -s build_artifacts/_build "${{ inputs.plugin_package_directory }}"
 
+          # This directory will hold the output from the test run.
+          test_output_dir="$(pwd)/plugin_test_output"
+
           cd irods_testing_environment
           . venv_testing_env/bin/activate
+
+          # Disable immediate exit on error. This is needed so that useful info in the XML test output
+          # can be printed to the console and shown in the workflow output.
+          set +e
+
+          # Run the tests!
           project_dir="${{ inputs.irods_testing_environment_project_os }}/${{ inputs.irods_testing_environment_project_os }}-${{ inputs.irods_testing_environment_project_db }}"
           python run_plugin_tests.py \
             "${GITHUB_REPOSITORY#${GITHUB_REPOSITORY_OWNER}/}" \
             --project-directory "projects/${project_dir}" \
             --irods-package-directory ../build_artifacts/_build_irods \
             --plugin-package-directory .. \
-            --discard-logs \
+            --output-directory "$test_output_dir" \
             -v
+          test_run_ec=$?
+
+          # Print the summary line in each XML file. This line holds info like the number of passing,
+          # failing, and skipped tests.
+          echo '--- TESTSUITE SUMMARY (BEGIN) ---'
+          find "$test_output_dir" -name '*.xml' -type f | xargs grep -h '<testsuite '
+          echo '--- TESTSUITE SUMMARY (END) ---'
+
+          # Print the failure info so that developers can determine what needs attention.
+          if [ "$test_run_ec" -ne 0 ]; then
+            echo '--- TEST FAILURES (BEGIN) ---'
+            find "$test_output_dir" -name '*.xml' -type f | xargs grep -hA 3 '<failure type'
+            echo '--- TEST FAILURES (END) ---'
+          fi
+
+          echo '--- SKIPPED TESTS (BEGIN) ---'
+          find "$test_output_dir" -name '*.xml' -type f | xargs grep -hC 1 '<skipped type'
+          echo '--- SKIPPED TESTS (END) ---'
+
+          exit "$test_run_ec"
