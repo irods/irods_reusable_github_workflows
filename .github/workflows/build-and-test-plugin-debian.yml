@@ -104,73 +104,10 @@ jobs:
   run_tests:
     needs: build_plugin
 
-    name: "Test: ${{ inputs.irods_package_version }}, ${{ inputs.irods_testing_environment_project_os }}, ${{ inputs.irods_testing_environment_project_db }}"
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Download build output
-        uses: actions/download-artifact@v7
-        with:
-          name: build_output-${{ inputs.build_artifact_suffix }}
-          path: ${{ inputs.plugin_package_directory }}
-
-      - name: Set up docker compose
-        uses: docker/setup-compose-action@v1
-
-      - name: Set up iRODS testing environment
-        run: |
-          git clone -b main --depth 1 --single-branch https://github.com/irods/irods_testing_environment
-          cd irods_testing_environment
-          python3 -m venv venv_testing_env
-          . venv_testing_env/bin/activate
-          python --version
-          pip install docker GitPython cryptography
-          pip freeze
-
-      - name: Run tests
-        run: |
-          ls -l "${{ inputs.plugin_package_directory }}"
-
-          # This directory will hold the output from the test run.
-          test_output_dir="$(pwd)/plugin_test_output"
-
-          cd irods_testing_environment
-          . venv_testing_env/bin/activate
-
-          # Disable immediate exit on error. This is needed so that useful info in the XML test output
-          # can be printed to the console and shown in the workflow output.
-          set +e
-
-          # Run the tests!
-          project_dir="${{ inputs.irods_testing_environment_project_os }}/${{ inputs.irods_testing_environment_project_os }}-${{ inputs.irods_testing_environment_project_db }}"
-          python run_plugin_tests.py \
-            "${GITHUB_REPOSITORY#${GITHUB_REPOSITORY_OWNER}/}" \
-            --project-directory "projects/${project_dir}" \
-            --irods-package-version ${{ inputs.irods_package_version }} \
-            --plugin-package-directory .. \
-            --output-directory "$test_output_dir" \
-            -v
-          test_run_ec=$?
-
-          # Print the summary line in each XML file. This line holds info like the number of passing,
-          # failing, and skipped tests.
-          echo '--- TESTSUITE SUMMARY (BEGIN) ---'
-          find "$test_output_dir" -name '*.xml' -type f | xargs grep -h '<testsuite '
-          echo '--- TESTSUITE SUMMARY (END) ---'
-
-          # Print the failure info so that developers can determine what needs attention.
-          if [ "$test_run_ec" -ne 0 ]; then
-            echo '--- TEST FAILURES (BEGIN) ---'
-            find "$test_output_dir" -name '*.xml' -type f | xargs grep -hA 3 '<failure type'
-            echo '--- TEST FAILURES (END) ---'
-          fi
-
-          echo '--- SKIPPED TESTS (BEGIN) ---'
-          find "$test_output_dir" -name '*.xml' -type f | xargs grep -hC 1 '<skipped type'
-          echo '--- SKIPPED TESTS (END) ---'
-
-          exit "$test_run_ec"
+    uses: korydraughn/irods_reusable_github_workflows/.github/workflows/test-plugin.yml@57.m
+    with:
+      irods_package_version: ${{ inputs.irods_package_version }}
+      build_artifact_suffix: ${{ inputs.build_artifact_suffix }}
+      plugin_package_directory: ${{ inputs.plugin_package_directory }}
+      irods_testing_environment_project_os: ${{ inputs.irods_testing_environment_project_os }}
+      irods_testing_environment_project_db: ${{ inputs.irods_testing_environment_project_db }}
