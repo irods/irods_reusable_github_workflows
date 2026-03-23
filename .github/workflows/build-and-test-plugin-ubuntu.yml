@@ -108,7 +108,7 @@ jobs:
   run_tests:
     needs: build_plugin
 
-    uses: korydraughn/irods_reusable_github_workflows/.github/workflows/test-plugin.yml@57.m
+    uses: irods/irods_reusable_github_workflows/.github/workflows/test-plugin.yml@main
     with:
       irods_package_version: ${{ inputs.irods_package_version }}
       build_artifact_suffix: ${{ inputs.build_artifact_suffix }}
