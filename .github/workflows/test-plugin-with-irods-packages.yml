@@ -62,6 +62,11 @@ jobs:
           # This directory will hold the output from the test run.
           test_output_dir="$(pwd)/plugin_test_output"
 
+          # The absolute path to the test hook from the checked out plugin repository.
+          # If changes are made to the test hook, this path paired with the --test-hook-path
+          # parameter makes sure they are used by the testing environment.
+          test_hook_path="$(pwd)/irods_consortium_continuous_integration_test_hook.py"
+
           cd irods_testing_environment
           . venv_testing_env/bin/activate
 
@@ -77,6 +82,7 @@ jobs:
             --irods-package-directory ../build_artifacts/_build_irods \
             --plugin-package-directory .. \
             --output-directory "$test_output_dir" \
+            --test-hook-path "$test_hook_path" \
             -v
           test_run_ec=$?
 
