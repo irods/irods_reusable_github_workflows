@@ -114,6 +114,15 @@ jobs:
             irods_testing_environment_project_os: ubuntu-24.04
             irods_testing_environment_project_db: postgres-16
 
+          # Ubuntu 26.04
+          - docker_image: ubuntu:26.04
+            cache_key_irods_packages_prefix: cache-irods-ubuntu-26.04
+            ccache_key: ccache-irods-ubuntu-26.04
+            build_artifact_suffix: ubuntu_26-main
+            plugin_package_directory: Ubuntu_26
+            irods_testing_environment_project_os: ubuntu-26.04
+            irods_testing_environment_project_db: postgres-16
+
     uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-pipeline-ubuntu.yml@main
     with:
       docker_image: ${{ matrix.docker_image }}
