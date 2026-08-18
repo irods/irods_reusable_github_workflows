@@ -69,7 +69,7 @@ jobs:
                 echo "deb [signed-by=/etc/apt/keyrings/renci-irods-unstable-archive-keyring.pgp arch=amd64] https://unstable.irods.org/apt/ $(lsb_release -sc) main" | \
                   sudo tee /etc/apt/sources.list.d/renci-irods-unstable.list
                 sudo apt-get update -qq
-                # iRODS 4.3.4
+                # iRODS 4.3
                 sudo apt-get install -qq \
                     irods-externals-avro-libcxx1.11.0-3 \
                     irods-externals-boost-libcxx1.81.0-1 \
@@ -85,13 +85,13 @@ jobs:
                     irods-externals-redis4.0.10-0 \
                     irods-externals-spdlog-libcxx1.9.2-2 \
                     irods-externals-zeromq4-1-libcxx4.1.8-1
-                # iRODS 5.0.0
+                # iRODS 5
                 sudo apt-get install -qq \
                     irods-externals-boost1.81.0-2 \
                     irods-externals-clang16.0.6-0 \
                     irods-externals-jsoncons0.178.0-0 \
                     irods-externals-jwt-cpp0.6.99.1-0 \
-                    irods-externals-nanodbc2.13.0-3 \
+                    irods-externals-nanodbc2.14.0+216-1 \
                     irods-externals-qpid-proton0.36.0-3 \
                     irods-externals-redis4.0.10-1
             - name: Install iRODS Development Package

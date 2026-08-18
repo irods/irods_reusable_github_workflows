@@ -148,7 +148,7 @@ jobs:
             irods-externals-boost1.81.0-2 \
             irods-externals-clang16.0.6-0 \
             irods-externals-jsoncons0.178.0-0 \
-            irods-externals-nanodbc2.13.0-3
+            irods-externals-nanodbc2.14.0+216-1
 
       - name: Configure ccache
         if: steps.irods.outputs.cache-hit != 'true'
