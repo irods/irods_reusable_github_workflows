@@ -85,6 +85,7 @@ jobs:
             --plugin-package-directory .. \
             --output-directory "$test_output_dir" \
             --test-hook-path "$test_hook_path" \
+            --skip-objectid-sequence-bump \
             -v
           test_run_ec=$?
 
