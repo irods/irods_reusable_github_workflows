@@ -123,7 +123,7 @@ jobs:
 
           # Ubuntu 26.04
           - docker_image: ubuntu:26.04
-            irods_package_version: 5.1.0-0~noble
+            irods_package_version: 5.1.0-0~resolute
             build_artifact_suffix: ubuntu_26-5.1.0-0
             plugin_package_directory: Ubuntu_26
             irods_testing_environment_project_os: ubuntu-26.04
