@@ -140,9 +140,9 @@ jobs:
     uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-pipeline-ubuntu.yml@main
     with:
       docker_image: ubuntu:22.04
-      cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04
-      ccache_key: ccache-irods-ubuntu-22.04
-      build_artifact_suffix: ubuntu_22-main
+      cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04-mysql
+      ccache_key: ccache-irods-ubuntu-22.04-mysql
+      build_artifact_suffix: ubuntu_22-main-mysql
       plugin_package_directory: Ubuntu_22
       irods_testing_environment_project_os: ubuntu-22.04
       irods_testing_environment_project_db: mysql-8.0
@@ -154,9 +154,9 @@ jobs:
     uses: irods/irods_reusable_github_workflows/.github/workflows/build-and-test-plugin-with-irods-packages-pipeline-ubuntu.yml@main
     with:
       docker_image: ubuntu:22.04
-      cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04
-      ccache_key: ccache-irods-ubuntu-22.04
-      build_artifact_suffix: ubuntu_22-main
+      cache_key_irods_packages_prefix: cache-irods-ubuntu-22.04-mariadb
+      ccache_key: ccache-irods-ubuntu-22.04-mariadb
+      build_artifact_suffix: ubuntu_22-main-mariadb
       plugin_package_directory: Ubuntu_22
       irods_testing_environment_project_os: ubuntu-22.04
       irods_testing_environment_project_db: mariadb-10.11
