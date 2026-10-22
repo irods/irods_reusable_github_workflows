@@ -169,7 +169,8 @@ jobs:
         if: steps.irods.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
-          key: ${{ inputs.ccache_key }}
+          key: "${{ inputs.ccache_key }}-${{ steps.init.outputs.sha_irods }}"
+          restore-keys: "${{ inputs.ccache_key }}-"
           path: /irods_build_cache/
 
       - name: Build iRODS packages
@@ -180,6 +181,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DIRODS_ENABLE_STATIC_SHA1=Yes \
             -GNinja \
             -B _build_irods \
             -S irods
